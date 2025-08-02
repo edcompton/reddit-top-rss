@@ -21,7 +21,7 @@ $accessToken = file_get_contents('cache/token/token.txt');
 if(empty($accessToken)) {
   $authString = base64_encode(REDDIT_CLIENT_ID . ':' . REDDIT_CLIENT_SECRET);
   $ch = curl_init();
-  curl_setopt($ch, CURLOPT_URL, 'https://www.reddit.com/api/v1/access_token');
+  curl_setopt($ch, CURLOPT_URL, 'https://old.reddit.com/api/v1/access_token');
   curl_setopt($ch, CURLOPT_POST, 1);
   curl_setopt($ch, CURLOPT_POSTFIELDS, 'grant_type=client_credentials');
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
