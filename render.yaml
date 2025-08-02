@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: reddit-top-rss
+    runtime: docker
+    repo: https://github.com/edcompton/reddit-top-rss
+    branch: master
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: REDDIT_USER
+        sync: false
+      - key: REDDIT_CLIENT_ID
+        value: oYFtCvH-oSJ5YpjC38yqKQ
+      - key: REDDIT_CLIENT_SECRET
+        value: PoWS9IZFlo1jV9F8zNsCGfWA-DHMYg
+      - key: DEFAULT_SUBREDDIT
+        value: pics
+      - key: CACHE_REDDIT_JSON
+        value: "true"
+      - key: CACHE_MERCURY_CONTENT
+        value: "true"
+      - key: CACHE_RSS_FEEDS
+        value: "true"
+      - key: CONFIG_VERSION
+        value: "1"
+      - key: MERCURY_URL
+        sync: false
+      - key: MERCURY_API_KEY
+        sync: false
