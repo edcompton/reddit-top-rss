@@ -186,19 +186,38 @@ foreach($jsonFeedFileItems as $item) {
 		}
 
 
-		// Create "description" node under "item"
-		$descriptionNode = $itemNode->appendChild($xml->createElement("description"));
-
-
-		// Create description text for "description" node
+		// Create description text for both "description" and "content:encoded" nodes
 		$itemDescription = "";
 
 
-		// Description comments link and metadata
-		$itemDescription .= "<p><a href='https://www.reddit.com" . $item["data"]["permalink"] . "'>Post permalink</a></p>";
-		
-		// Add post score (upvotes)
-		$itemDescription .= "<p>Score: " . $item["data"]["score"] . " upvotes</p>";
+		// For i.redd.it posts, create a cleaner structure like the Go version
+		if ($item["data"]["domain"] == "i.redd.it") {
+			// Add metadata section like Go version
+			$author = isset($item["data"]["author"]) ? $item["data"]["author"] : "unknown";
+			$flair = isset($item["data"]["link_flair_text"]) ? $item["data"]["link_flair_text"] : "";
+			
+			$itemDescription .= '<div class="post-metadata" style="margin-bottom:15px; padding: 10px; background-color: #f9f9f9; border-radius: 5px; border-left: 3px solid #ff4500;">';
+			$itemDescription .= '<div style="display: flex; flex-direction: column;">';
+			$itemDescription .= '<div style="display: flex; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">';
+			$itemDescription .= '<strong style="margin-right: 10px;"><a href="https://old.reddit.com/u/' . $author . '" style="text-decoration: none; color: #336699;">u/' . $author . '</a></strong>';
+			$itemDescription .= '<span style="color: #666; font-size: 0.9em;">' . $item["data"]["score"] . ' points</span>';
+			if ($flair) {
+				$itemDescription .= ' • <span style="display:inline-block; background-color:#f0f0f0; padding:2px 8px; border-radius:3px; font-size:0.9em;">' . htmlspecialchars($flair) . '</span>';
+			}
+			$itemDescription .= '</div>';
+			$itemDescription .= '<div style="margin-top: 8px;">';
+			$itemDescription .= '<a href="https://old.reddit.com' . $item["data"]["permalink"] . '" style="text-decoration: none; color: #336699;">View Comments on Reddit</a>';
+			$itemDescription .= '</div>';
+			$itemDescription .= '</div>';
+			$itemDescription .= '</div>';
+		} else {
+			// Keep original structure for non-i.redd.it posts
+			// Description comments link and metadata
+			$itemDescription .= "<p><a href='https://www.reddit.com" . $item["data"]["permalink"] . "'>Post permalink</a></p>";
+			
+			// Add post score (upvotes)
+			$itemDescription .= "<p>Score: " . $item["data"]["score"] . " upvotes</p>";
+		}
 
 
 		// Add media if it exists
@@ -263,8 +282,8 @@ foreach($jsonFeedFileItems as $item) {
 			// Reddit images - use webfeedsFeaturedVisual class for RSS reader compatibility
 			case $item["data"]["domain"] == "i.redd.it":
 				$imageAltText = htmlspecialchars($item["data"]["title"]);
-				// Use webfeedsFeaturedVisual class like the Go version for better RSS reader support
-				$mediaEmbed = '<img src="' . $item["data"]["url"] . '" class="webfeedsFeaturedVisual" alt="' . $imageAltText . '" style="max-width:100%; width:auto; display:block; margin:0 auto; margin-bottom:10px;" />';
+				// Match Go version structure exactly - simpler without extra styling
+				$mediaEmbed = '<img src="' . $item["data"]["url"] . '" class="webfeedsFeaturedVisual" alt="' . $imageAltText . '" style="max-width:100%;" />';
 				$itemDescription .= $mediaEmbed;
 				break;
 
@@ -409,9 +428,19 @@ foreach($jsonFeedFileItems as $item) {
 			$itemDescription .= '<img src="' . $item["data"]["thumbnail"] . '" class="webfeedsFeaturedVisual" style="display:none;" alt="' . htmlspecialchars($item["data"]["title"]) . '" />';
 		}
 		
-		//fill description node with CDATA content
-		$descriptionContents = $xml->createCDATASection($itemDescription);
-		$descriptionNode->appendChild($descriptionContents);
+		// CRITICAL FIX: Create both description and content:encoded fields like the Go version
+		// This is required for maximum RSS reader compatibility, especially Readwise
+		
+		// Create "description" node - Go version HTML-encodes this field
+		$descriptionNode = $itemNode->appendChild($xml->createElement("description"));
+		// Use the same HTML encoding approach as Go (HTML entities, not CDATA)
+		$descriptionNode->appendChild($xml->createTextNode(str_replace(['<', '>', '"'], ['&lt;', '&gt;', '&quot;'], $itemDescription)));
+		
+		// Create "content:encoded" node with CDATA content
+		// This mirrors the Go implementation which sets both fields
+		$contentEncodedNode = $itemNode->appendChild($xml->createElement("content:encoded"));
+		$contentEncodedContents = $xml->createCDATASection($itemDescription);
+		$contentEncodedNode->appendChild($contentEncodedContents);
 
 
 		//Published date
