@@ -207,7 +207,7 @@ foreach($jsonFeedFileItems as $item) {
 
 			// Reddit images
 			case $item["data"]["domain"] == "i.redd.it":
-				$mediaEmbed = "<p><a href='" . $item["data"]["url"] . "'><img src='" . $item["data"]["url"] . "'></img></a></p>";
+				$mediaEmbed = "<p><a href='" . $item["data"]["url"] . "'><img src='" . $item["data"]["url"] . "' /></a></p>";
 				$itemDescription .= $mediaEmbed;
 				break;
 
@@ -250,7 +250,7 @@ foreach($jsonFeedFileItems as $item) {
 		switch (true) {
 
 			// Selftext
-			case isset($item["data"]["selftext_html"]):
+			case isset($item["data"]["selftext_html"]) && !empty($item["data"]["selftext_html"]):
 				$selftext = $item["data"]["selftext_html"];
 				$selftext = str_replace("&lt;", "<", $selftext);
 				$selftext = str_replace("&gt;", ">", $selftext);
@@ -270,6 +270,14 @@ foreach($jsonFeedFileItems as $item) {
 					if ($mercuryJSON = json_decode($mercuryJSON)) {
 						$itemDescription .= $mercuryJSON->content;
 					}
+				}
+			break;
+			
+			// Default fallback for text posts with no content
+			default:
+				// Add post title as fallback content for text-only posts
+				if(empty($itemDescription) || $itemDescription == "<p><a href='https://www.reddit.com" . $item["data"]["permalink"] . "'>Post permalink</a> </p>") {
+					$itemDescription .= "<p>" . htmlspecialchars($item["data"]["title"]) . "</p>";
 				}
 			break;
 		}
