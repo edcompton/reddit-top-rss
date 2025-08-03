@@ -36,7 +36,35 @@ include "sort-and-filter.php";
 
 // Get Subreddit feed
 $jsonFeedFile = getFile("https://oauth.reddit.com/r/" . $subreddit . ".json", "redditJSON", "cache/reddit/$subreddit.json", 60 * 5, $accessToken);
+
+// Check if Reddit API call failed
+if (!$jsonFeedFile || $jsonFeedFile === false) {
+	// Output error as XML comment for debugging
+	echo '<?xml version="1.0" encoding="UTF-8"?>';
+	echo '<rss version="2.0"><channel>';
+	echo '<title>Error</title>';
+	echo '<description>Failed to connect to Reddit API. Please check your credentials.</description>';
+	echo '<link>https://www.reddit.com</link>';
+	echo '<!-- Debug: No response from Reddit API -->';
+	echo '</channel></rss>';
+	exit;
+}
+
 $jsonFeedFileParsed = json_decode($jsonFeedFile, true);
+
+// Check if JSON parsing failed or no data
+if (!$jsonFeedFileParsed || !isset($jsonFeedFileParsed["data"]["children"])) {
+	// Output error as XML comment for debugging
+	echo '<?xml version="1.0" encoding="UTF-8"?>';
+	echo '<rss version="2.0"><channel>';
+	echo '<title>Error</title>';
+	echo '<description>Invalid response from Reddit API</description>';
+	echo '<link>https://www.reddit.com</link>';
+	echo '<!-- Debug: ' . htmlspecialchars(substr($jsonFeedFile, 0, 500)) . ' -->';
+	echo '</channel></rss>';
+	exit;
+}
+
 $jsonFeedFileItems = $jsonFeedFileParsed["data"]["children"];
 usort($jsonFeedFileItems, "sortByCreatedDate");
 

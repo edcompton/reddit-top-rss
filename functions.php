@@ -20,7 +20,8 @@ function getFile($url, $requestType, $cachedFileLocation, $cacheExpiration, $acc
 				curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 				$mercuryJSON = curl_exec($ch);
 				if(!$mercuryJSON) {
-					die("Connection Failure");
+					// Mercury is optional - return empty JSON on failure
+					return '{}';
 				}
 				file_put_contents($cachedFileLocation, $mercuryJSON);
 				return $mercuryJSON;
@@ -38,7 +39,8 @@ function getFile($url, $requestType, $cachedFileLocation, $cacheExpiration, $acc
 			curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
 			$mercuryJSON = curl_exec($curl);
 			if(!$mercuryJSON) {
-				die("Connection Failure");
+				// Mercury is optional - return empty JSON on failure
+				return '{}';
 			}
 			return $mercuryJSON;
 			curl_close($ch);
