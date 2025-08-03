@@ -128,3 +128,45 @@ function sizeFormat($bytes) {
 		return $bytes . " B";
 	}
 }
+
+
+// Force balance HTML tags
+// Simple implementation to close unclosed tags
+function force_balance_tags($html) {
+	// Stack to keep track of open tags
+	$openTags = array();
+	
+	// Find all opening and closing tags
+	preg_match_all('/<\/?([a-zA-Z0-9]+)[^>]*>/', $html, $matches, PREG_OFFSET_CAPTURE);
+	
+	foreach ($matches[1] as $i => $match) {
+		$tag = strtolower($match[0]);
+		$fullTag = $matches[0][$i][0];
+		
+		// Skip self-closing tags
+		if (in_array($tag, array('br', 'hr', 'img', 'input', 'meta', 'link'))) {
+			continue;
+		}
+		
+		// Check if it's a closing tag
+		if (substr($fullTag, 0, 2) == '</') {
+			// Remove from stack if it matches
+			$key = array_search($tag, $openTags);
+			if ($key !== false) {
+				unset($openTags[$key]);
+				$openTags = array_values($openTags);
+			}
+		} else {
+			// Add to stack of open tags
+			$openTags[] = $tag;
+		}
+	}
+	
+	// Close any remaining open tags
+	while (!empty($openTags)) {
+		$tag = array_pop($openTags);
+		$html .= "</$tag>";
+	}
+	
+	return $html;
+}

@@ -55,10 +55,11 @@ $rssNode = $xml->appendChild($rss);
 $rssNode->setAttribute("version", "2.0");
 
 
-// Set attributes
+// Set attributes with media namespace for better image handling
 $rssNode->setAttribute("xmlns:dc", "http://purl.org/dc/elements/1.1/");
 $rssNode->setAttribute("xmlns:content", "http://purl.org/rss/1.0/modules/content/");
 $rssNode->setAttribute("xmlns:atom", "https://www.w3.org/2005/Atom");
+$rssNode->setAttribute("xmlns:media", "http://search.yahoo.com/mrss/");
 
 
 // Create RFC822 Date format to comply with RFC822
@@ -69,7 +70,6 @@ $buildDate = gmdate(DATE_RFC2822, strtotime($dateF));
 // Create "channel" element under "RSS" element
 $channel = $xml->createElement("channel");
 $channelNode = $rssNode->appendChild($channel);
-$channelImageNode = $rssNode->appendChild($channel);
 
 
 // A feed should contain an atom:link element
@@ -87,9 +87,11 @@ $channelNode->appendChild($xml->createElement("description", $feedDescriptionTex
 $channelNode->appendChild($xml->createElement("link", "https://www.reddit.com/r/" . $subreddit));
 $channelNode->appendChild($xml->createElement("language", "en-us"));
 $channelNode->appendChild($xml->createElement("lastBuildDate", $buildDate));
-$channelNode->appendChild($xml->createElement("generator", "PHP DOMDocument"));
+$channelNode->appendChild($xml->createElement("generator", "Reddit Top RSS"));
 $channelImageNode = $channelNode->appendChild($xml->createElement("image"));
 $channelImageNode->appendChild($xml->createElement("url", "https://www.redditstatic.com/desktop2x/img/favicon/android-icon-192x192.png"));
+$channelImageNode->appendChild($xml->createElement("title", "/r/" . $subreddit));
+$channelImageNode->appendChild($xml->createElement("link", "https://www.reddit.com/r/" . $subreddit));
 
 
 // Loop through feed items
@@ -147,8 +149,11 @@ foreach($jsonFeedFileItems as $item) {
 		$itemDescription = "";
 
 
-		// Description comments link
-		$itemDescription .= "<p><a href='https://www.reddit.com" . $item["data"]["permalink"] . "'>Post permalink</a> </p>";
+		// Description comments link and metadata
+		$itemDescription .= "<p><a href='https://www.reddit.com" . $item["data"]["permalink"] . "'>Post permalink</a></p>";
+		
+		// Add post score (upvotes)
+		$itemDescription .= "<p>Score: " . $item["data"]["score"] . " upvotes</p>";
 
 
 		// Add media if it exists
@@ -185,6 +190,7 @@ foreach($jsonFeedFileItems as $item) {
 			// Reddit videos
 			case $item["data"]["domain"] == "v.redd.it":
 				$mediaEmbed = "<iframe height='800' width='800' frameborder='0' allowfullscreen='yes' scrolling='yes' src='https://old.reddit.com/mediaembed/" . $item["data"]["id"] . "'></iframe>";
+				$mediaEmbed .= "<p>If video doesn't play, <a href='https://www.reddit.com" . $item["data"]["permalink"] . "'>view on Reddit with audio</a></p>";
 				$mediaEmbed .= "<p><img src='" . $item["data"]["thumbnail"] . "' /></p>";
 				$itemDescription .= $mediaEmbed;
 			break;
@@ -207,7 +213,10 @@ foreach($jsonFeedFileItems as $item) {
 
 			// Reddit images
 			case $item["data"]["domain"] == "i.redd.it":
-				$mediaEmbed = "<p><a href='" . $item["data"]["url"] . "'><img src='" . $item["data"]["url"] . "' /></a></p>";
+				$imageAltText = htmlspecialchars($item["data"]["title"]);
+				$mediaEmbed = "<p><a href='" . $item["data"]["url"] . "'><img src='" . $item["data"]["url"] . "' alt='" . $imageAltText . "' /></a></p>";
+				// Add title text for better Readwise parsing
+				$mediaEmbed .= "<p>" . htmlspecialchars($item["data"]["title"]) . "</p>";
 				$itemDescription .= $mediaEmbed;
 				break;
 
@@ -268,7 +277,21 @@ foreach($jsonFeedFileItems as $item) {
 				$mercuryJSON = getFile($itemDataUrl, "mercuryJSON", "cache/mercury/" . filter_var($itemDataUrl, FILTER_SANITIZE_ENCODED) . ".json", 60 * 60 * 24 * 7, $accessToken);
 				if(!isset(json_decode($mercuryJSON)->message) || json_decode($mercuryJSON)->message != "Internal server error") {
 					if ($mercuryJSON = json_decode($mercuryJSON)) {
-						$itemDescription .= $mercuryJSON->content;
+						// Add content with intelligent truncation at 7000 words
+						$content = $mercuryJSON->content;
+						if(isset($mercuryJSON->word_count) && $mercuryJSON->word_count > 7000) {
+							// Truncate content at approximately 7000 words
+							$words = str_word_count(strip_tags($content), 2);
+							if(count($words) > 7000) {
+								$positions = array_keys($words);
+								$truncatePos = $positions[6999];
+								$content = substr($content, 0, $truncatePos);
+								// Close any open tags
+								$content = force_balance_tags($content);
+								$content .= "<p><a href='" . $itemDataUrl . "'>Read more...</a></p>";
+							}
+						}
+						$itemDescription .= $content;
 					}
 				}
 			break;
@@ -283,9 +306,11 @@ foreach($jsonFeedFileItems as $item) {
 		}
 
 
-		// Add article's best comments
+		// Add article's best comments (max 3)
 		if(isset($_GET["comments"]) && $_GET["comments"] > 0) {
-			$commentsURL = "https://oauth.reddit.com/r/" . $item["data"]["subreddit"] . "/comments/" . $item["data"]["id"] . ".json?depth=1&showmore=0&limit=" . (intval($_GET["comments"]) + 1);
+			// Cap comments at 3 maximum
+			$requestedComments = min(intval($_GET["comments"]), 3);
+			$commentsURL = "https://oauth.reddit.com/r/" . $item["data"]["subreddit"] . "/comments/" . $item["data"]["id"] . ".json?depth=1&showmore=0&limit=" . ($requestedComments + 1);
 			$commentsJSON = getFile($commentsURL, "redditJSON", "cache/reddit/" . $item["data"]["subreddit"] . "-comments-" . $item["data"]["id"] . $_GET["comments"] . ".json", 60 * 5, $accessToken);
 			$commentsJSONParsed = json_decode($commentsJSON, true);
 			$comments = $commentsJSONParsed[1]["data"]["children"];
@@ -293,8 +318,10 @@ foreach($jsonFeedFileItems as $item) {
 				unset($comments[0]);
 				$comments = array_values($comments);
 			}
-			if(count($comments) > $_GET["comments"]) {
-				$commentCount = $_GET["comments"];
+			// Limit to requested comments or 3, whichever is smaller
+			$requestedComments = min(intval($_GET["comments"]), 3);
+			if(count($comments) > $requestedComments) {
+				$commentCount = $requestedComments;
 			} else {
 				$commentCount = count($comments);
 			}
