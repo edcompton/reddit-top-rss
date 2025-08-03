@@ -1,6 +1,23 @@
 <?php
 // With some help from https://www.sanwebe.com/2013/07/creating-valid-rss-feed-using-php
 
+// Load configuration - CRITICAL FIX for standalone access
+if (!defined('REDDIT_USER')) {
+	// Load environment-based config if available
+	if (file_exists('env-config.php')) {
+		require_once 'env-config.php';
+	} elseif (file_exists('config.php')) {
+		require_once 'config.php';
+	} else {
+		// Fallback to default config
+		require_once 'config-default.php';
+	}
+	// Load functions after config
+	require_once 'functions.php';
+	// Load auth to get access token
+	require_once 'auth.php';
+}
+
 header("Content-Type: text/xml; charset=utf-8", true);
 
 
