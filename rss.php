@@ -195,7 +195,7 @@ foreach($jsonFeedFileItems as $item) {
 				$itemDescription .= $mediaEmbed;
 			break;
 
-			// Reddit galleries
+			// Reddit galleries - add webfeedsFeaturedVisual class to all images
 			case strpos($item["data"]["url"], "www.reddit.com/gallery/"):
 				$jsonGalleryURL = str_replace("www.reddit.com/gallery/", "oauth.reddit.com/comments/", $item["data"]["url"]) . '.json';
 				$jsonGalleryFileName = str_replace("https://oauth.reddit.com/comments/", "", $jsonGalleryURL);
@@ -203,37 +203,47 @@ foreach($jsonFeedFileItems as $item) {
 				$jsonGalleryFileParsed = json_decode($jsonGalleryFile, true);
 				$jsonGalleryFileItems = $jsonGalleryFileParsed[0]["data"]["children"][0]["data"]["media_metadata"];
 				$mediaEmbed = "";
+				$imageCount = 0;
 				foreach ($jsonGalleryFileItems as $image) :
 					$previewImageURL = str_replace("preview.redd.it", "i.redd.it", $image["p"]["3"]["u"]);
+					$previewImageURL = str_replace("&amp;", "&", $previewImageURL);
 					$fullImageURL = str_replace("preview.redd.it", "i.redd.it", $image["s"]["u"]);
-					$mediaEmbed .= "<p><a href='" . $fullImageURL . "'><img src='" . $previewImageURL . "'></a></p>";
+					$fullImageURL = str_replace("&amp;", "&", $fullImageURL);
+					$imageCount++;
+					$mediaEmbed .= '<a href="' . $fullImageURL . '"><img src="' . $previewImageURL . '" class="webfeedsFeaturedVisual" alt="Gallery image ' . $imageCount . '" style="max-width:100%; width:auto; display:block; margin:0 auto; margin-bottom:10px;" /></a>';
 				endforeach;
 				$itemDescription .= $mediaEmbed;
 				break;
 
-			// Reddit images
+			// Reddit images - use webfeedsFeaturedVisual class for RSS reader compatibility
 			case $item["data"]["domain"] == "i.redd.it":
 				$imageAltText = htmlspecialchars($item["data"]["title"]);
-				$mediaEmbed = "<p><a href='" . $item["data"]["url"] . "'><img src='" . $item["data"]["url"] . "' alt='" . $imageAltText . "' /></a></p>";
-				// Add title text for better Readwise parsing
-				$mediaEmbed .= "<p>" . htmlspecialchars($item["data"]["title"]) . "</p>";
+				// Use webfeedsFeaturedVisual class like the Go version for better RSS reader support
+				$mediaEmbed = '<img src="' . $item["data"]["url"] . '" class="webfeedsFeaturedVisual" alt="' . $imageAltText . '" style="max-width:100%; width:auto; display:block; margin:0 auto; margin-bottom:10px;" />';
 				$itemDescription .= $mediaEmbed;
 				break;
 
-			// Preview images
+			// Preview images - add webfeedsFeaturedVisual class
 			case !empty($item["data"]["preview"]["images"]) && strpos($item["data"]["preview"]["images"][0]["source"]["url"],"redditmedia") !== false:
-				$mediaEmbed = "<p><img src='" . $item["data"]["preview"]["images"][0]["source"]["url"] . "' /></p>";
+				$previewUrl = str_replace("&amp;", "&", $item["data"]["preview"]["images"][0]["source"]["url"]);
+				$mediaEmbed = '<img src="' . $previewUrl . '" class="webfeedsFeaturedVisual" alt="' . htmlspecialchars($item["data"]["title"]) . '" style="max-width:100%; width:auto; display:block; margin:0 auto; margin-bottom:10px;" />';
 				$itemDescription .= $mediaEmbed;
 			break;
 
-			// Image in URL
+			// Image in URL - add webfeedsFeaturedVisual class
 			case strpos($itemDataUrl, "jpg") !== false || strpos($itemDataUrl, "jpeg") !== false || strpos($itemDataUrl, "png") !== false || strpos($itemDataUrl, "gif") !== false:
-				$itemDescription .= "<p><img src='" . $itemDataUrl . "' /></p>";
+				$isGif = strpos($itemDataUrl, "gif") !== false;
+				$gifClass = $isGif ? " webfeedsGif" : "";
+				$itemDescription .= '<img src="' . $itemDataUrl . '" class="webfeedsFeaturedVisual' . $gifClass . '" alt="' . htmlspecialchars($item["data"]["title"]) . '" style="max-width:100%; width:auto; display:block; margin:0 auto; margin-bottom:10px;" />';
 			break;
 
-			// Imgur
+			// Imgur - add webfeedsFeaturedVisual class
 			case strpos($itemDataUrl, "imgur.com") !== false:
-				$itemDescription .= "<p><img src='" . $itemDataUrl . ".jpg' /></p>";
+				$imgurUrl = $itemDataUrl;
+				if(!strpos($imgurUrl, ".jpg") && !strpos($imgurUrl, ".png") && !strpos($imgurUrl, ".gif")) {
+					$imgurUrl .= ".jpg";
+				}
+				$itemDescription .= '<img src="' . $imgurUrl . '" class="webfeedsFeaturedVisual" alt="' . htmlspecialchars($item["data"]["title"]) . '" style="max-width:100%; width:auto; display:block; margin:0 auto; margin-bottom:10px;" />';
 			break;
 
 			// Livememe
@@ -341,6 +351,19 @@ foreach($jsonFeedFileItems as $item) {
 		}
 
 
+		// Add hidden thumbnail as fallback if we have one and it's not already in content
+		// This ensures RSS readers always have an image to display
+		if(isset($item["data"]["thumbnail"]) && 
+		   !empty($item["data"]["thumbnail"]) && 
+		   $item["data"]["thumbnail"] != "self" && 
+		   $item["data"]["thumbnail"] != "default" &&
+		   $item["data"]["thumbnail"] != "nsfw" &&
+		   $item["data"]["thumbnail"] != "spoiler" &&
+		   strpos($itemDescription, 'webfeedsFeaturedVisual') === false) {
+			// Add hidden thumbnail with webfeedsFeaturedVisual class as fallback
+			$itemDescription .= '<img src="' . $item["data"]["thumbnail"] . '" class="webfeedsFeaturedVisual" style="display:none;" alt="' . htmlspecialchars($item["data"]["title"]) . '" />';
+		}
+		
 		//fill description node with CDATA content
 		$descriptionContents = $xml->createCDATASection($itemDescription);
 		$descriptionNode->appendChild($descriptionContents);
