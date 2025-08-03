@@ -329,6 +329,46 @@ foreach($jsonFeedFileItems as $item) {
 				$itemDescription .= $mediaEmbed;
 			break;
 
+			// Streaming sites (streamin.one, streamable.com, etc.)
+			case strpos($itemDataUrl, "streamin.one") !== false || 
+			     strpos($itemDataUrl, "streamable.com") !== false ||
+			     strpos($itemDataUrl, "streamja.com") !== false ||
+			     strpos($itemDataUrl, "streamff.com") !== false ||
+			     strpos($itemDataUrl, "streamwo.com") !== false:
+				
+				// Determine the streaming platform
+				$streamPlatform = "streaming site";
+				if (strpos($itemDataUrl, "streamable.com") !== false) {
+					$streamPlatform = "Streamable";
+					// Streamable has better embed support
+					$embedUrl = str_replace("streamable.com/", "streamable.com/e/", $itemDataUrl);
+				} else if (strpos($itemDataUrl, "streamin.one") !== false) {
+					$streamPlatform = "StreamIN";
+					$embedUrl = $itemDataUrl;
+				} else {
+					$embedUrl = $itemDataUrl;
+				}
+				
+				// Create stream content box
+				$itemDescription .= '<div style="background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 5px; padding: 15px; margin-bottom: 15px;">';
+				$itemDescription .= '<strong>📺 ' . $streamPlatform . ' Video</strong><br/>';
+				
+				// Try to embed (success depends on platform's X-Frame-Options)
+				$itemDescription .= '<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; margin: 15px 0;">';
+				$itemDescription .= '<iframe src="' . htmlspecialchars($embedUrl) . '" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;" frameborder="0" allowfullscreen allow="autoplay; fullscreen"></iframe>';
+				$itemDescription .= '</div>';
+				
+				// Always provide direct link as fallback
+				$itemDescription .= '<p><a href="' . htmlspecialchars($itemDataUrl) . '" target="_blank" style="display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">🔗 Open in Browser</a></p>';
+				$itemDescription .= '<p style="font-size: 0.9em; color: #666; margin-top: 10px;">If the video doesn\'t play above, click the link to watch in your browser.</p>';
+				$itemDescription .= '</div>';
+				
+				// Add thumbnail if available
+				if (isset($item["data"]["thumbnail"]) && $item["data"]["thumbnail"] != "default" && $item["data"]["thumbnail"] != "self" && $item["data"]["thumbnail"] != "nsfw" && $item["data"]["thumbnail"] != "spoiler") {
+					$itemDescription .= '<img src="' . $item["data"]["thumbnail"] . '" alt="Video thumbnail" style="max-width: 100%; margin-top: 10px; border-radius: 5px;" />';
+				}
+			break;
+
 			// Image in URL - add webfeedsFeaturedVisual class
 			case strpos($itemDataUrl, "jpg") !== false || strpos($itemDataUrl, "jpeg") !== false || strpos($itemDataUrl, "png") !== false || strpos($itemDataUrl, "gif") !== false:
 				$isGif = strpos($itemDataUrl, "gif") !== false;
