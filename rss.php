@@ -190,9 +190,13 @@ foreach($jsonFeedFileItems as $item) {
 		$itemDescription = "";
 
 
-		// For i.redd.it posts, create a cleaner structure like the Go version
+		// For i.redd.it posts, put the image FIRST, then metadata
 		if ($item["data"]["domain"] == "i.redd.it") {
-			// Add metadata section like Go version
+			// Add the image at the very beginning for Readwise visibility
+			$imageAltText = htmlspecialchars($item["data"]["title"]);
+			$itemDescription .= '<img src="' . $item["data"]["url"] . '" class="webfeedsFeaturedVisual" alt="' . $imageAltText . '" style="max-width:100%; display:block; margin-bottom:15px;" />';
+			
+			// Then add metadata section
 			$author = isset($item["data"]["author"]) ? $item["data"]["author"] : "unknown";
 			$flair = isset($item["data"]["link_flair_text"]) ? $item["data"]["link_flair_text"] : "";
 			
@@ -210,6 +214,9 @@ foreach($jsonFeedFileItems as $item) {
 			$itemDescription .= '</div>';
 			$itemDescription .= '</div>';
 			$itemDescription .= '</div>';
+			
+			// Set flag to skip the duplicate image in the switch statement
+			$imageAlreadyAdded = true;
 		} else {
 			// Keep original structure for non-i.redd.it posts
 			// Description comments link and metadata
@@ -217,6 +224,7 @@ foreach($jsonFeedFileItems as $item) {
 			
 			// Add post score (upvotes)
 			$itemDescription .= "<p>Score: " . $item["data"]["score"] . " upvotes</p>";
+			$imageAlreadyAdded = false;
 		}
 
 
@@ -251,12 +259,37 @@ foreach($jsonFeedFileItems as $item) {
 				$itemDescription .= $mediaEmbed;
 			break;
 
-			// Reddit videos
+			// Reddit videos - NOTE: v.redd.it videos have separated audio/video streams
 			case $item["data"]["domain"] == "v.redd.it":
-				$mediaEmbed = "<iframe height='800' width='800' frameborder='0' allowfullscreen='yes' scrolling='yes' src='https://old.reddit.com/mediaembed/" . $item["data"]["id"] . "'></iframe>";
-				$mediaEmbed .= "<p>If video doesn't play, <a href='https://www.reddit.com" . $item["data"]["permalink"] . "'>view on Reddit with audio</a></p>";
-				$mediaEmbed .= "<p><img src='" . $item["data"]["thumbnail"] . "' /></p>";
-				$itemDescription .= $mediaEmbed;
+				// Check if we have Reddit video data
+				if (isset($item["data"]["secure_media"]["reddit_video"])) {
+					$videoData = $item["data"]["secure_media"]["reddit_video"];
+					$fallbackUrl = $videoData["fallback_url"];
+					$hasAudio = !$videoData["is_gif"];
+					
+					// Add a note about audio limitations
+					$itemDescription .= '<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 10px; margin-bottom: 10px;">';
+					$itemDescription .= '<strong>⚠️ Note:</strong> Reddit videos may not play with audio in RSS readers. ';
+					$itemDescription .= '<a href="https://www.reddit.com' . $item["data"]["permalink"] . '" target="_blank">View on Reddit for full experience</a>';
+					$itemDescription .= '</div>';
+					
+					// Try HTML5 video element (won't have audio in most readers)
+					$itemDescription .= '<video controls style="width: 100%; max-width: 800px;">';
+					$itemDescription .= '<source src="' . htmlspecialchars($fallbackUrl) . '" type="video/mp4">';
+					$itemDescription .= 'Your RSS reader does not support video playback.';
+					$itemDescription .= '</video>';
+					
+					// Add thumbnail as fallback
+					if (isset($item["data"]["thumbnail"]) && $item["data"]["thumbnail"] != "default") {
+						$itemDescription .= '<p><img src="' . $item["data"]["thumbnail"] . '" alt="Video thumbnail" style="max-width: 100%;" /></p>';
+					}
+				} else {
+					// Fallback to iframe embed
+					$mediaEmbed = "<iframe height='800' width='800' frameborder='0' allowfullscreen='yes' scrolling='yes' src='https://old.reddit.com/mediaembed/" . $item["data"]["id"] . "'></iframe>";
+					$mediaEmbed .= "<p>If video doesn't play, <a href='https://www.reddit.com" . $item["data"]["permalink"] . "'>view on Reddit with audio</a></p>";
+					$mediaEmbed .= "<p><img src='" . $item["data"]["thumbnail"] . "' /></p>";
+					$itemDescription .= $mediaEmbed;
+				}
 			break;
 
 			// Reddit galleries - add webfeedsFeaturedVisual class to all images
@@ -279,12 +312,14 @@ foreach($jsonFeedFileItems as $item) {
 				$itemDescription .= $mediaEmbed;
 				break;
 
-			// Reddit images - use webfeedsFeaturedVisual class for RSS reader compatibility
+			// Reddit images - skip if already added at the beginning
 			case $item["data"]["domain"] == "i.redd.it":
-				$imageAltText = htmlspecialchars($item["data"]["title"]);
-				// Match Go version structure exactly - simpler without extra styling
-				$mediaEmbed = '<img src="' . $item["data"]["url"] . '" class="webfeedsFeaturedVisual" alt="' . $imageAltText . '" style="max-width:100%;" />';
-				$itemDescription .= $mediaEmbed;
+				// Image already added at the beginning for i.redd.it posts
+				if (!isset($imageAlreadyAdded) || !$imageAlreadyAdded) {
+					$imageAltText = htmlspecialchars($item["data"]["title"]);
+					$mediaEmbed = '<img src="' . $item["data"]["url"] . '" class="webfeedsFeaturedVisual" alt="' . $imageAltText . '" style="max-width:100%;" />';
+					$itemDescription .= $mediaEmbed;
+				}
 				break;
 
 			// Preview images - add webfeedsFeaturedVisual class
