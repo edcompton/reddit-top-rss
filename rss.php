@@ -309,10 +309,6 @@ foreach($jsonFeedFileItems as $item) {
 					}
 					$itemDescription .= 'Your RSS reader does not support video playback.';
 					$itemDescription .= '</video>';
-
-					if (isset($item["data"]["thumbnail"]) && $item["data"]["thumbnail"] != "default") {
-						$itemDescription .= '<p><img src="' . htmlspecialchars($item["data"]["thumbnail"]) . '" alt="Video thumbnail" style="max-width: 100%;" /></p>';
-					}
 				} else {
 					// Fallback to iframe embed
 					$mediaEmbed = "<iframe height='800' width='800' frameborder='0' allowfullscreen='yes' scrolling='yes' src='https://old.reddit.com/mediaembed/" . $item["data"]["id"] . "'></iframe>";
