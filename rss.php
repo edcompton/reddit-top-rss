@@ -297,8 +297,9 @@ foreach($jsonFeedFileItems as $item) {
 					}
 
 					$posterAttr = '';
-					if (isset($item["data"]["thumbnail"]) && $item["data"]["thumbnail"] != "default") {
-						$posterAttr = ' poster="' . htmlspecialchars($item["data"]["thumbnail"]) . '"';
+					$thumb = isset($item["data"]["thumbnail"]) ? $item["data"]["thumbnail"] : '';
+					if ($thumb !== '' && !in_array($thumb, ['default', 'self', 'nsfw', 'spoiler', 'image'], true)) {
+						$posterAttr = ' poster="' . htmlspecialchars($thumb) . '"';
 					}
 
 					$itemDescription .= '<video controls preload="metadata" playsinline' . $posterAttr . ' style="width: 100%; max-width: 800px;">';
