@@ -259,29 +259,59 @@ foreach($jsonFeedFileItems as $item) {
 				$itemDescription .= $mediaEmbed;
 			break;
 
-			// Reddit videos - NOTE: v.redd.it videos have separated audio/video streams
+			// Reddit videos - v.redd.it serves video and audio as separate DASH streams.
+			// If REDMUX_URL is configured, the source is rewritten to a server-side mux
+			// service so the embedded player has audio. Without REDMUX_URL the original
+			// (silent) fallback URL is used and a warning banner is shown.
 			case $item["data"]["domain"] == "v.redd.it":
-				// Check if we have Reddit video data
 				if (isset($item["data"]["secure_media"]["reddit_video"])) {
 					$videoData = $item["data"]["secure_media"]["reddit_video"];
 					$fallbackUrl = $videoData["fallback_url"];
-					$hasAudio = !$videoData["is_gif"];
-					
-					// Add a note about audio limitations
-					$itemDescription .= '<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 10px; margin-bottom: 10px;">';
-					$itemDescription .= '<strong>⚠️ Note:</strong> Reddit videos may not play with audio in RSS readers. ';
-					$itemDescription .= '<a href="https://www.reddit.com' . $item["data"]["permalink"] . '" target="_blank">View on Reddit for full experience</a>';
-					$itemDescription .= '</div>';
-					
-					// Try HTML5 video element (won't have audio in most readers)
-					$itemDescription .= '<video controls style="width: 100%; max-width: 800px;">';
-					$itemDescription .= '<source src="' . htmlspecialchars($fallbackUrl) . '" type="video/mp4">';
+					$hasAudio = isset($videoData["has_audio"]) ? (bool) $videoData["has_audio"] : !$videoData["is_gif"];
+
+					// Extract v.redd.it id from the fallback URL
+					$videoId = null;
+					if (preg_match('#v\.redd\.it/([a-z0-9]+)/#i', $fallbackUrl, $m)) {
+						$videoId = $m[1];
+					}
+
+					$muxedUrl = null;
+					if ($hasAudio && $videoId && defined('REDMUX_URL') && !empty(REDMUX_URL)) {
+						$muxedUrl = rtrim(REDMUX_URL, '/') . '/v/' . $videoId . '.mp4';
+						if (defined('REDMUX_API_KEY') && !empty(REDMUX_API_KEY)) {
+							$muxedUrl .= '?key=' . urlencode(REDMUX_API_KEY);
+						}
+					}
+
+					if ($muxedUrl) {
+						$videoSrc = $muxedUrl;
+					} else {
+						$videoSrc = $fallbackUrl;
+						// Only show the audio warning when we cannot mux server-side
+						if ($hasAudio) {
+							$itemDescription .= '<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 10px; margin-bottom: 10px;">';
+							$itemDescription .= '<strong>⚠️ Note:</strong> Reddit videos may not play with audio in RSS readers. ';
+							$itemDescription .= '<a href="https://www.reddit.com' . $item["data"]["permalink"] . '" target="_blank">View on Reddit for full experience</a>';
+							$itemDescription .= '</div>';
+						}
+					}
+
+					$posterAttr = '';
+					if (isset($item["data"]["thumbnail"]) && $item["data"]["thumbnail"] != "default") {
+						$posterAttr = ' poster="' . htmlspecialchars($item["data"]["thumbnail"]) . '"';
+					}
+
+					$itemDescription .= '<video controls preload="metadata" playsinline' . $posterAttr . ' style="width: 100%; max-width: 800px;">';
+					$itemDescription .= '<source src="' . htmlspecialchars($videoSrc) . '" type="video/mp4">';
+					if ($muxedUrl) {
+						// Fall back to the silent video if the mux service is down
+						$itemDescription .= '<source src="' . htmlspecialchars($fallbackUrl) . '" type="video/mp4">';
+					}
 					$itemDescription .= 'Your RSS reader does not support video playback.';
 					$itemDescription .= '</video>';
-					
-					// Add thumbnail as fallback
+
 					if (isset($item["data"]["thumbnail"]) && $item["data"]["thumbnail"] != "default") {
-						$itemDescription .= '<p><img src="' . $item["data"]["thumbnail"] . '" alt="Video thumbnail" style="max-width: 100%;" /></p>';
+						$itemDescription .= '<p><img src="' . htmlspecialchars($item["data"]["thumbnail"]) . '" alt="Video thumbnail" style="max-width: 100%;" /></p>';
 					}
 				} else {
 					// Fallback to iframe embed

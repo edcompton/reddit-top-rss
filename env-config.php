@@ -56,6 +56,24 @@ if (getenv("MERCURY_API_KEY")) {
   define('MERCURY_API_KEY', '');
 }
 
+// Reddit video mux service URL (mux v.redd.it audio + video into one MP4)
+if (getenv("REDMUX_URL")) {
+  define('REDMUX_URL', getenv("REDMUX_URL"));
+} elseif (!empty($_SERVER["REDMUX_URL"])) {
+  define('REDMUX_URL', $_SERVER["REDMUX_URL"]);
+} else {
+  define('REDMUX_URL', '');
+}
+
+// Optional API key for redmux service
+if (getenv("REDMUX_API_KEY")) {
+  define('REDMUX_API_KEY', getenv("REDMUX_API_KEY"));
+} elseif (!empty($_SERVER["REDMUX_API_KEY"])) {
+  define('REDMUX_API_KEY', $_SERVER["REDMUX_API_KEY"]);
+} else {
+  define('REDMUX_API_KEY', '');
+}
+
 // Cache Reddit JSON files
 if (getenv("CACHE_REDDIT_JSON")) {
   define('CACHE_REDDIT_JSON', getenv("CACHE_REDDIT_JSON"));
